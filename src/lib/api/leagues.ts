@@ -30,7 +30,9 @@ export async function createLeague(
   payload: CreateLeaguePayload
 ): Promise<{ league: League }> {
   const { data } = await api.post<{ league: League }>("/leagues", payload);
-  return data;
+  return {
+    league: normalizeLeague(data.league as unknown as Record<string, unknown>),
+  };
 }
 
 export async function joinLeague(
@@ -40,7 +42,10 @@ export async function joinLeague(
     "/leagues/join",
     payload
   );
-  return data;
+  return {
+    ...data,
+    league: normalizeLeague(data.league as unknown as Record<string, unknown>),
+  };
 }
 
 export async function leaveLeague(
