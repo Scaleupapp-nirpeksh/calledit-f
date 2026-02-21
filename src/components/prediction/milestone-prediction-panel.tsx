@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { MILESTONE_TYPES, type MilestoneType } from "@/lib/types/constants";
 import { useCreateMilestonePrediction } from "@/lib/queries/predictions";
+import { useMatchPlayers } from "@/lib/queries/matches";
 import { cn } from "@/lib/utils";
-import { Loader2, Award } from "lucide-react";
+import { Loader2, Award, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 interface MilestonePredictionPanelProps {
@@ -19,6 +20,14 @@ const MILESTONE_LABELS: Record<MilestoneType, string> = {
   team_200: "Team 200+",
 };
 
+function isBatterMilestone(type: MilestoneType) {
+  return type === "batter_50" || type === "batter_100";
+}
+
+function isBowlerMilestone(type: MilestoneType) {
+  return type === "bowler_3w" || type === "bowler_5w";
+}
+
 export function MilestonePredictionPanel({
   matchId,
 }: MilestonePredictionPanelProps) {
@@ -29,15 +38,31 @@ export function MilestonePredictionPanel({
   const [willAchieve, setWillAchieve] = useState<boolean | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const mutation = useCreateMilestonePrediction(matchId);
+  const { data: playersData } = useMatchPlayers(matchId);
 
-  const needsPlayer =
-    milestoneType && milestoneType !== "team_200";
+  const needsPlayer = milestoneType && milestoneType !== "team_200";
+
+  // Determine which player list to show based on milestone type
+  const playerOptions: string[] = milestoneType
+    ? isBatterMilestone(milestoneType)
+      ? playersData?.batters ?? []
+      : isBowlerMilestone(milestoneType)
+        ? playersData?.bowlers ?? []
+        : []
+    : [];
+
+  const hasPlayerOptions = playerOptions.length > 0;
 
   const canSubmit =
     milestoneType &&
     willAchieve !== null &&
     (!needsPlayer || playerName.trim().length > 0) &&
     !mutation.isPending;
+
+  const handleMilestoneTypeChange = (type: MilestoneType) => {
+    setMilestoneType(type);
+    setPlayerName("");
+  };
 
   const handleSubmit = () => {
     if (!milestoneType || willAchieve === null) return;
@@ -90,7 +115,7 @@ export function MilestonePredictionPanel({
         {MILESTONE_TYPES.map((type) => (
           <button
             key={type}
-            onClick={() => setMilestoneType(type)}
+            onClick={() => handleMilestoneTypeChange(type)}
             className={cn(
               "rounded-lg border px-3 py-1.5 text-xs font-medium transition-all cursor-pointer",
               milestoneType === type
@@ -103,15 +128,35 @@ export function MilestonePredictionPanel({
         ))}
       </div>
 
-      {/* Player name input (if needed) */}
+      {/* Player selection (dropdown or free text fallback) */}
       {needsPlayer && (
-        <input
-          type="text"
-          value={playerName}
-          onChange={(e) => setPlayerName(e.target.value)}
-          placeholder="Player name..."
-          className="mb-3 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-purple-500"
-        />
+        hasPlayerOptions ? (
+          <div className="relative mb-3">
+            <select
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              className="w-full appearance-none rounded-lg border border-border bg-background px-3 py-2 pr-8 text-sm outline-none focus:border-purple-500"
+            >
+              <option value="">
+                Select {isBatterMilestone(milestoneType!) ? "batter" : "bowler"}...
+              </option>
+              {playerOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          </div>
+        ) : (
+          <input
+            type="text"
+            value={playerName}
+            onChange={(e) => setPlayerName(e.target.value)}
+            placeholder="Player name..."
+            className="mb-3 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-purple-500"
+          />
+        )
       )}
 
       {/* Yes/No selector */}

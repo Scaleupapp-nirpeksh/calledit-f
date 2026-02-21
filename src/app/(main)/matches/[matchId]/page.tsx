@@ -256,6 +256,11 @@ export default function MatchDetailPage({
               team2={match.team2}
               team2Code={match.team2_code}
               team2Img={match.team2_img}
+              currentPick={
+                predSummary?.predictions?.find(
+                  (p) => p.type === "match_winner"
+                )?.prediction ?? null
+              }
             />
 
             {/* Milestone */}

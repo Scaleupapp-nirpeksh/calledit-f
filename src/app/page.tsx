@@ -46,7 +46,7 @@ const FEATURES = [
     icon: Users,
     title: "Private Leagues",
     description:
-      "Create leagues with friends, share invite codes, and compete head-to-head across the entire IPL season.",
+      "Create leagues with friends, share invite codes, and compete head-to-head across the entire tournament.",
   },
   {
     icon: TrendingUp,
@@ -60,7 +60,7 @@ const HOW_IT_WORKS = [
   {
     step: "01",
     title: "Pick a Live Match",
-    description: "Choose from ongoing IPL and T20 matches",
+    description: "Choose from ongoing T20 and international matches",
   },
   {
     step: "02",
@@ -146,7 +146,7 @@ export default function LandingPage() {
           {/* Badge */}
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary">
             <Zap className="h-3.5 w-3.5" />
-            IPL 2026 is live
+            T20 World Cup 2026 is live
           </div>
 
           <h1 className="mx-auto max-w-3xl text-4xl font-black leading-[1.1] tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">

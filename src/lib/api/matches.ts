@@ -85,3 +85,23 @@ export async function generateAiReport(matchId: string) {
   }>(`/admin/ai/generate-report/${matchId}`);
   return data;
 }
+
+// ── Match Players ──
+
+export interface MatchPlayersResponse {
+  team1: string;
+  team2: string;
+  team1_code: string;
+  team2_code: string;
+  batters: string[];
+  bowlers: string[];
+}
+
+export async function getMatchPlayers(
+  matchId: string
+): Promise<MatchPlayersResponse> {
+  const { data } = await api.get<MatchPlayersResponse>(
+    `/matches/${matchId}/players`
+  );
+  return data;
+}

@@ -15,6 +15,8 @@ export const queryKeys = {
       ["matches", "ai-preview", matchId] as const,
     aiReport: (matchId: string) =>
       ["matches", "ai-report", matchId] as const,
+    players: (matchId: string) =>
+      ["matches", "players", matchId] as const,
   },
 
   competitions: {

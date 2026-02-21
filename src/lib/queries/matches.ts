@@ -10,6 +10,7 @@ import {
   getAiReport,
   generateAiPreview,
   generateAiReport,
+  getMatchPlayers,
   type MatchFilters,
 } from "@/lib/api/matches";
 
@@ -65,6 +66,15 @@ export function useAiReport(matchId: string) {
   return useQuery({
     queryKey: queryKeys.matches.aiReport(matchId),
     queryFn: () => getAiReport(matchId),
+    enabled: !!matchId,
+    retry: false,
+  });
+}
+
+export function useMatchPlayers(matchId: string) {
+  return useQuery({
+    queryKey: queryKeys.matches.players(matchId),
+    queryFn: () => getMatchPlayers(matchId),
     enabled: !!matchId,
     retry: false,
   });

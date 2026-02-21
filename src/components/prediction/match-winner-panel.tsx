@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useCreateMatchWinnerPrediction } from "@/lib/queries/predictions";
 import { TeamBadge } from "@/components/match/team-badge";
 import { cn } from "@/lib/utils";
-import { Loader2, Trophy } from "lucide-react";
+import { Loader2, Trophy, Lock } from "lucide-react";
 import { toast } from "sonner";
 
 interface MatchWinnerPanelProps {
@@ -16,7 +16,6 @@ interface MatchWinnerPanelProps {
   team2Code: string;
   team2Img?: string | null;
   currentPick?: string | null;
-  changesRemaining?: number;
 }
 
 export function MatchWinnerPanel({
@@ -28,26 +27,29 @@ export function MatchWinnerPanel({
   team2Code,
   team2Img,
   currentPick = null,
-  changesRemaining = 2,
 }: MatchWinnerPanelProps) {
   const [selected, setSelected] = useState<string | null>(currentPick);
-  const [submitted, setSubmitted] = useState(!!currentPick);
+  const [locked, setLocked] = useState(!!currentPick);
   const mutation = useCreateMatchWinnerPrediction(matchId);
 
   const handleSubmit = () => {
-    if (!selected || mutation.isPending) return;
+    if (!selected || mutation.isPending || locked) return;
 
     mutation.mutate(
       { match_id: matchId, predicted_winner: selected },
       {
         onSuccess: () => {
-          setSubmitted(true);
+          setLocked(true);
           toast.success("Match winner prediction submitted!");
         },
         onError: (err) => {
           const message =
             (err as { response?: { data?: { detail?: string } } }).response
               ?.data?.detail ?? "Failed to submit prediction";
+          // If backend says already submitted, lock the UI
+          if (message.toLowerCase().includes("already submitted")) {
+            setLocked(true);
+          }
           toast.error(message);
         },
       }
@@ -67,35 +69,32 @@ export function MatchWinnerPanel({
           <span className="text-sm font-semibold">Predict Winner</span>
           <span className="text-xs text-muted-foreground">(100pts)</span>
         </div>
-        {submitted && changesRemaining > 0 && (
-          <button
-            onClick={() => setSubmitted(false)}
-            className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
-          >
-            Change ({changesRemaining} left)
-          </button>
+        {locked && (
+          <div className="flex items-center gap-1 text-xs text-yellow-500">
+            <Lock className="h-3 w-3" />
+            <span>Locked</span>
+          </div>
         )}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         {teams.map((team) => {
           const isSelected = selected === team.name;
-          const isDisabled = submitted;
 
           return (
             <button
               key={team.name}
-              onClick={() => !isDisabled && setSelected(team.name)}
-              disabled={isDisabled && !isSelected}
+              onClick={() => !locked && setSelected(team.name)}
+              disabled={locked}
               className={cn(
                 "flex flex-col items-center gap-2 rounded-xl border-2 p-4 transition-all",
                 isSelected
                   ? "border-yellow-500 bg-yellow-500/10"
                   : "border-border",
-                !isDisabled &&
+                !locked &&
                   !isSelected &&
                   "hover:border-yellow-500/40 cursor-pointer",
-                isDisabled && !isSelected && "opacity-40"
+                locked && !isSelected && "opacity-30"
               )}
             >
               <TeamBadge code={team.code} imgUrl={team.img} size="lg" />
@@ -107,12 +106,17 @@ export function MatchWinnerPanel({
               >
                 {team.code}
               </span>
+              {isSelected && locked && (
+                <span className="text-[10px] font-medium text-yellow-500">
+                  Your pick
+                </span>
+              )}
             </button>
           );
         })}
       </div>
 
-      {!submitted && selected && (
+      {!locked && selected && (
         <button
           onClick={handleSubmit}
           disabled={mutation.isPending}
