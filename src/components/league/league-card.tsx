@@ -10,8 +10,13 @@ interface LeagueCardProps {
 }
 
 export function LeagueCard({ league, isOwner }: LeagueCardProps) {
+  // Guard: backend may return _id instead of id
+  const leagueId =
+    league.id ?? (league as unknown as Record<string, string>)._id;
+  if (!leagueId) return null;
+
   return (
-    <Link href={`/leagues/${league.id}`}>
+    <Link href={`/leagues/${leagueId}`}>
       <div className="group flex items-center gap-4 rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/30">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <Users className="h-6 w-6" />

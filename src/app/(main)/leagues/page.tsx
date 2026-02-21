@@ -13,7 +13,11 @@ export default function LeaguesPage() {
   const { data: user } = useCurrentUser();
   const { data, isLoading } = useMyLeagues();
 
-  const leagues = data?.leagues ?? [];
+  // Handle both { leagues: [...] } and direct array responses
+  const rawLeagues = data?.leagues ?? (Array.isArray(data) ? data : []);
+  const leagues = rawLeagues.filter(
+    (l) => l.id || (l as unknown as Record<string, string>)._id
+  );
 
   return (
     <>
