@@ -21,6 +21,13 @@ export const metadata: Metadata = {
   description:
     "Predict ball-by-ball outcomes in live cricket matches. Compete with friends and climb the leaderboards.",
   manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
