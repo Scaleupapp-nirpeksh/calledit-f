@@ -25,15 +25,16 @@ export function useLiveMatches() {
   return useQuery({
     queryKey: queryKeys.matches.live(),
     queryFn: getLiveMatches,
-    refetchInterval: 30_000,
+    refetchInterval: 10_000,
   });
 }
 
-export function useMatch(matchId: string) {
+export function useMatch(matchId: string, pollInterval?: number | false) {
   return useQuery({
     queryKey: queryKeys.matches.detail(matchId),
     queryFn: () => getMatch(matchId),
     enabled: !!matchId,
+    refetchInterval: pollInterval || undefined,
   });
 }
 

@@ -40,6 +40,7 @@ import {
   Brain,
   BarChart3,
   Sparkles,
+  Ban,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -51,18 +52,42 @@ export default function MatchDetailPage({
 }) {
   const { matchId } = use(params);
 
-  // REST data (initial load + non-live matches)
+  // REST data — initial load
   const { data: restMatch, isLoading } = useMatch(matchId);
+
+  // Determine if we need to poll (live or toss status)
+  const shouldPoll = restMatch ? isLiveStatus(restMatch.status) : false;
+
+  // Poll every 7s for live matches to get fresh scores
+  const { data: polledMatch } = useMatch(
+    matchId,
+    shouldPoll ? 7_000 : false
+  );
+
+  // Freshest match data: socket > polled REST > initial REST
+  const liveMatch = useMatchStore((s) => s.match);
+  const predictionWindow = useMatchStore((s) => s.predictionWindow);
+  const match = liveMatch?.id === matchId
+    ? liveMatch
+    : (polledMatch ?? restMatch);
+
+  // Derive statuses from the freshest match data
+  const matchLive = match ? isLiveStatus(match.status) : false;
+  const matchCompleted = match?.status === "completed";
+  const matchAbandoned = match?.status === "abandoned";
+  const matchUpcoming = match?.status === "upcoming";
+
+  // AI content — don't fetch report for abandoned matches, don't fetch preview for completed
   const {
     data: aiPreview,
     isError: previewError,
     isLoading: previewLoading,
-  } = useAiPreview(matchId);
+  } = useAiPreview(matchAbandoned || matchCompleted ? "" : matchId);
   const {
     data: aiReport,
     isError: reportError,
     isLoading: reportLoading,
-  } = useAiReport(matchId);
+  } = useAiReport(matchCompleted ? matchId : "");
 
   // Prediction summary (for syncing boost/streak state)
   const { data: predSummary } = useMatchPredictionSummary(matchId);
@@ -72,13 +97,7 @@ export default function MatchDetailPage({
   const generateReport = useGenerateAiReport(matchId);
 
   // Socket: join match room for live updates
-  const isLive = restMatch ? isLiveStatus(restMatch.status) : false;
-  useMatchRoom(isLive ? matchId : null);
-
-  // Live state from socket (overrides REST when available)
-  const liveMatch = useMatchStore((s) => s.match);
-  const predictionWindow = useMatchStore((s) => s.predictionWindow);
-  const match = liveMatch?.id === matchId ? liveMatch : restMatch;
+  useMatchRoom(matchLive ? matchId : null);
 
   // Sync prediction summary to store
   const syncSummary = usePredictionStore((s) => s.syncSummary);
@@ -122,23 +141,19 @@ export default function MatchDetailPage({
     );
   }
 
-  const live = isLiveStatus(match.status);
-  const isCompleted = match.status === "completed";
-  const isUpcoming = match.status === "upcoming";
-
   // Determine which AI content to show
-  const aiContent = isCompleted ? aiReport?.content : aiPreview?.content;
-  const aiLoading = isCompleted ? reportLoading : previewLoading;
-  const aiMissing = isCompleted
+  const aiContent = matchCompleted ? aiReport?.content : aiPreview?.content;
+  const aiLoading = matchCompleted ? reportLoading : previewLoading;
+  const aiMissing = matchCompleted
     ? !aiReport?.content && (reportError || !reportLoading)
     : !aiPreview?.content && (previewError || !previewLoading);
 
   const handleGenerate = () => {
-    const mutation = isCompleted ? generateReport : generatePreview;
+    const mutation = matchCompleted ? generateReport : generatePreview;
     mutation.mutate(undefined, {
       onSuccess: () => {
         toast.success(
-          isCompleted
+          matchCompleted
             ? "AI Report generated successfully"
             : "AI Preview generated successfully"
         );
@@ -180,6 +195,21 @@ export default function MatchDetailPage({
           <LiveScoreHeader match={match} />
         </div>
 
+        {/* Abandoned match banner */}
+        {matchAbandoned && (
+          <div className="mx-4 mb-2 flex items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3">
+            <Ban className="h-5 w-5 text-destructive shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-destructive">Match Abandoned</p>
+              {match.result_text && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {match.result_text}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Venue + Date */}
         <div className="flex items-center justify-between border-b border-border px-4 pb-3">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -196,36 +226,36 @@ export default function MatchDetailPage({
           </span>
         </div>
 
-        {/* Win Probability (live + completed) */}
-        {(live || isCompleted) && (
+        {/* Win Probability (live + completed, NOT abandoned) */}
+        {(matchLive || matchCompleted) && (
           <div className="p-4 pb-0">
             <WinProbabilityBar match={match} />
           </div>
         )}
 
         {/* Prediction Summary (streak, points, boosts) */}
-        {(live || isCompleted) && (
+        {(matchLive || matchCompleted) && (
           <div className="p-4 pb-0">
             <PredictionSummaryCard matchId={matchId} />
           </div>
         )}
 
         {/* Ball Prediction Panel (live only) */}
-        {live && (
+        {matchLive && (
           <div className="p-4 pb-0">
             <BallPredictionPanel matchId={matchId} />
           </div>
         )}
 
         {/* ML Probability Chart (live only) */}
-        {live && (
+        {matchLive && (
           <div className="p-4 pb-0">
-            <MlProbabilityChart matchId={matchId} isLive={live} />
+            <MlProbabilityChart matchId={matchId} isLive={matchLive} />
           </div>
         )}
 
         {/* Live: Ball log strip + Commentary */}
-        {live && (
+        {matchLive && (
           <div className="border-b border-border p-4 space-y-4">
             <BallLogStrip />
             <div>
@@ -236,7 +266,7 @@ export default function MatchDetailPage({
         )}
 
         {/* Other Prediction Types (live only) */}
-        {live && (
+        {matchLive && (
           <div className="space-y-4 p-4">
             {/* Over Prediction */}
             {match.current_innings && match.current_over != null && (
@@ -268,67 +298,71 @@ export default function MatchDetailPage({
           </div>
         )}
 
-        {/* AI Insights */}
-        {aiLoading ? (
-          <div className="border-b border-border p-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Loading AI insights...</span>
-            </div>
-          </div>
-        ) : aiContent ? (
-          <div className="border-b border-border p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/15">
-                <Brain className="h-4 w-4 text-primary" />
-              </div>
-              <h3 className="text-sm font-semibold">
-                {isCompleted ? "AI Match Report" : "AI Preview"}
-              </h3>
-            </div>
-            <div className="rounded-lg border border-border bg-muted/30 p-4">
-              <AiContent content={aiContent} />
-            </div>
-          </div>
-        ) : (
-          aiMissing &&
-          (isUpcoming || isCompleted) && (
-            <div className="border-b border-border p-4">
-              <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border bg-muted/20 py-6">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                  <Sparkles className="h-5 w-5 text-primary" />
+        {/* AI Insights — NOT for abandoned matches */}
+        {!matchAbandoned && (
+          <>
+            {aiLoading ? (
+              <div className="border-b border-border p-4">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Loading AI insights...</span>
                 </div>
-                <div className="text-center">
-                  <p className="text-sm font-medium">
-                    {isCompleted
-                      ? "AI Report not available"
-                      : "AI Preview not available"}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {isCompleted
-                      ? "Generate an AI analysis of this match"
-                      : "Generate an AI preview for this upcoming match"}
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  onClick={handleGenerate}
-                  disabled={isGenerating}
-                >
-                  {isGenerating ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="mr-2 h-4 w-4" />
-                  )}
-                  {isGenerating
-                    ? "Generating..."
-                    : isCompleted
-                      ? "Generate Report"
-                      : "Generate Preview"}
-                </Button>
               </div>
-            </div>
-          )
+            ) : aiContent ? (
+              <div className="border-b border-border p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/15">
+                    <Brain className="h-4 w-4 text-primary" />
+                  </div>
+                  <h3 className="text-sm font-semibold">
+                    {matchCompleted ? "AI Match Report" : "AI Preview"}
+                  </h3>
+                </div>
+                <div className="rounded-lg border border-border bg-muted/30 p-4">
+                  <AiContent content={aiContent} />
+                </div>
+              </div>
+            ) : (
+              aiMissing &&
+              (matchUpcoming || matchCompleted) && (
+                <div className="border-b border-border p-4">
+                  <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border bg-muted/20 py-6">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                      <Sparkles className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-medium">
+                        {matchCompleted
+                          ? "AI Report not available"
+                          : "AI Preview not available"}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {matchCompleted
+                          ? "Generate an AI analysis of this match"
+                          : "Generate an AI preview for this upcoming match"}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={handleGenerate}
+                      disabled={isGenerating}
+                    >
+                      {isGenerating ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="mr-2 h-4 w-4" />
+                      )}
+                      {isGenerating
+                        ? "Generating..."
+                        : matchCompleted
+                          ? "Generate Report"
+                          : "Generate Preview"}
+                    </Button>
+                  </div>
+                </div>
+              )
+            )}
+          </>
         )}
 
         {/* Quick Actions */}
@@ -349,7 +383,7 @@ export default function MatchDetailPage({
       </main>
 
       {/* Prediction result listener (invisible — handles toasts) */}
-      {live && <PredictionResultListener />}
+      {matchLive && <PredictionResultListener />}
     </>
   );
 }

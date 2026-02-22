@@ -12,6 +12,7 @@ interface LiveScoreHeaderProps {
 
 export function LiveScoreHeader({ match }: LiveScoreHeaderProps) {
   const live = isLiveStatus(match.status);
+  const abandoned = match.status === "abandoned";
 
   const team1Innings = match.innings.find(
     (i) => i.batting_team.toLowerCase() === match.team1.toLowerCase()
@@ -24,7 +25,8 @@ export function LiveScoreHeader({ match }: LiveScoreHeaderProps) {
     <div
       className={cn(
         "rounded-xl border bg-card p-4",
-        live && "border-primary/20 shadow-[0_0_20px_rgba(var(--primary),0.08)]"
+        live && "border-primary/20 shadow-[0_0_20px_rgba(var(--primary),0.08)]",
+        abandoned && "border-destructive/20 opacity-70"
       )}
     >
       <div className="mb-3 flex items-center justify-between">
